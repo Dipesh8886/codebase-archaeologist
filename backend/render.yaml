@@ -1,11 +1,9 @@
 services:
-  # Main API — handles auth, Q&A requests, graph requests, and now also
-  # runs the indexing worker in-process (Render's free tier only
-  # supports one always-on service, so both live here).
   - type: web
     name: codebase-archaeologist-api
     runtime: node
     plan: free
+    rootDir: backend
     buildCommand: npm install && bash scripts/fetch-grammars.sh
     startCommand: npm start
     envVars:
@@ -13,5 +11,3 @@ services:
         value: production
       - key: PORT
         value: 5000
-      # Remaining secrets (GITHUB_CLIENT_ID, MONGODB_URI, REDIS_URL, etc.)
-      # are set in the Render dashboard, not committed here.
