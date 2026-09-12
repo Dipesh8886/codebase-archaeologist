@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import { Worker } from 'bullmq';
-import { connectDatabase } from './config/database.js';
 import { redisConnection } from './services/queue.service.js';
 import { logger } from './utils/logger.js';
 import { Repo } from './models/Repo.js';
@@ -8,11 +7,8 @@ import { User } from './models/User.js';
 import { listRepoFiles, makeContentFetcher } from './services/github.service.js';
 import { chunkFile } from './services/chunking.service.js';
 import { embedChunks } from './services/embedding.service.js';
-import { upsertChunks, ensureCollection, getCollectionStorageEstimateMb } from './services/vectorStore.service.js';
+import { upsertChunks, getCollectionStorageEstimateMb } from './services/vectorStore.service.js';
 import { config } from './config/env.js';
-
-await connectDatabase();
-await ensureCollection();
 
 const BINARY_EXTENSIONS = ['.db', '.sqlite', '.sqlite3', '.exe', '.dll', '.so', '.class', '.jar', '.zip', '.pdf', '.woff', '.woff2', '.ttf', '.ico', '.bin', '.png', '.jpg', '.jpeg', '.gif'];
 
@@ -88,15 +84,33 @@ async function processIndexingJob(job) {
   }
 }
 
-const worker = new Worker('repo-indexing', processIndexingJob, {
-  connection: redisConnection,
-  concurrency: 2,
-  lockDuration: 600000,
-  stalledInterval: 30000,
-  maxStalledCount: 1,
-});
+export function startIndexingWorker() {
+  if (!redisConnection) {
+    logger.warn('REDIS_URL not configured — indexing worker not started');
+    return null;
+  }
 
-worker.on('completed', (job) => logger.info(`Indexing job ${job.id} completed`));
-worker.on('failed', (job, err) => logger.error(`Indexing job ${job?.id} failed`, { error: err.message }));
+  const worker = new Worker('repo-indexing', processIndexingJob, {
+    connection: redisConnection,
+    concurrency: 2,
+    lockDuration: 600000,
+    stalledInterval: 30000,
+    maxStalledCount: 1,
+  });
 
-logger.info('Indexing worker started');
+  worker.on('completed', (job) => logger.info(`Indexing job ${job.id} completed`));
+  worker.on('failed', (job, err) => logger.error(`Indexing job ${job?.id} failed`, { error: err.message }));
+
+  logger.info('Indexing worker started');
+  return worker;
+}
+
+// Lets `npm run worker` still start it standalone for local dev, without
+// affecting anything when this file is just imported by server.js.
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('src/worker.js')) {
+  const { connectDatabase } = await import('./config/database.js');
+  const { ensureCollection } = await import('./services/vectorStore.service.js');
+  await connectDatabase();
+  await ensureCollection();
+  startIndexingWorker();
+}

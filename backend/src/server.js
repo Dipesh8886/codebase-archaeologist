@@ -8,6 +8,7 @@ import { connectDatabase } from './config/database.js';
 import { ensureCollection } from './services/vectorStore.service.js';
 import { logger } from './utils/logger.js';
 import routes from './routes/index.js';
+import { startIndexingWorker } from './worker.js';
 
 validateConfig();
 
@@ -43,6 +44,8 @@ async function start() {
   try {
     await connectDatabase();
     await ensureCollection();
+
+    startIndexingWorker();
 
     app.listen(config.port, () => {
       logger.info(`Server listening on port ${config.port} (${config.nodeEnv})`);

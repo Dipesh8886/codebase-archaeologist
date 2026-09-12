@@ -1,5 +1,7 @@
 services:
-  # Main API — handles auth, Q&A requests, graph requests. Always-on free tier.
+  # Main API — handles auth, Q&A requests, graph requests, and now also
+  # runs the indexing worker in-process (Render's free tier only
+  # supports one always-on service, so both live here).
   - type: web
     name: codebase-archaeologist-api
     runtime: node
@@ -11,19 +13,5 @@ services:
         value: production
       - key: PORT
         value: 5000
-      # Remaining secrets (GITHUB_CLIENT_ID, MONGODB_URI, etc.) are set in
-      # the Render dashboard, not committed here.
-
-  # Background worker — consumes the indexing queue. Also free tier;
-  # Render's free plan allows this as a second always-on service under the
-  # same 750 hrs/month budget as long as combined usage stays under the cap
-  # (fine for a low-traffic portfolio deployment).
-  - type: worker
-    name: codebase-archaeologist-worker
-    runtime: node
-    plan: free
-    buildCommand: npm install && bash scripts/fetch-grammars.sh
-    startCommand: npm run worker
-    envVars:
-      - key: NODE_ENV
-        value: production
+      # Remaining secrets (GITHUB_CLIENT_ID, MONGODB_URI, REDIS_URL, etc.)
+      # are set in the Render dashboard, not committed here.
