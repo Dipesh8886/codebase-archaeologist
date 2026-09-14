@@ -106,10 +106,19 @@ export async function askQuestion(question, chunks) {
     return { answer, provider: 'groq' };
   } catch (err) {
     const shouldFallback = isRateLimitError(err) || (err.response?.status >= 500);
-    if (!shouldFallback) throw err;
+
+    if (!shouldFallback) {
+      logger.error('Groq call failed with a non-retryable error — not falling back', {
+        status: err.response?.status,
+        groqResponseData: JSON.stringify(err.response?.data),
+        message: err.message,
+      });
+      throw err;
+    }
 
     logger.warn('Groq unavailable, falling back to secondary LLM', {
       status: err.response?.status,
+      groqResponseData: JSON.stringify(err.response?.data),
       provider: config.fallbackLlm.provider,
     });
 
@@ -121,7 +130,9 @@ export async function askQuestion(question, chunks) {
     } catch (fallbackErr) {
       logger.error('Both primary and fallback LLM failed', {
         groqError: err.message,
+        groqResponseData: JSON.stringify(err.response?.data),
         fallbackError: fallbackErr.message,
+        fallbackResponseData: JSON.stringify(fallbackErr.response?.data),
       });
       throw new Error('All LLM providers are currently unavailable. Please try again shortly.');
     }
