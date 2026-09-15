@@ -99,7 +99,20 @@ export function startIndexingWorker() {
   });
 
   worker.on('completed', (job) => logger.info(`Indexing job ${job.id} completed`));
-  worker.on('failed', (job, err) => logger.error(`Indexing job ${job?.id} failed`, { error: err.message }));
+
+  worker.on('failed', async (job, err) => {
+    logger.error(`Indexing job ${job?.id} failed`, { error: err?.message });
+    if (job?.data?.repoId) {
+      try {
+        await Repo.findByIdAndUpdate(job.data.repoId, {
+          status: 'failed',
+          errorMessage: err?.message || 'Indexing failed unexpectedly',
+        });
+      } catch (updateErr) {
+        logger.error('Failed to mark repo as failed after job failure', { error: updateErr.message });
+      }
+    }
+  });
 
   logger.info('Indexing worker started');
   return worker;

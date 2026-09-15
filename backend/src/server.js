@@ -9,6 +9,7 @@ import { ensureCollection } from './services/vectorStore.service.js';
 import { logger } from './utils/logger.js';
 import routes from './routes/index.js';
 import { startIndexingWorker } from './worker.js';
+import axios from 'axios';
 
 validateConfig();
 
@@ -50,6 +51,15 @@ async function start() {
     app.listen(config.port, () => {
       logger.info(`Server listening on port ${config.port} (${config.nodeEnv})`);
     });
+        if (config.nodeEnv === 'production') {
+      const selfUrl = 'https://codebase-archaeologist-api.onrender.com/api/health';
+      setInterval(() => {
+        axios.get(selfUrl).catch(() => {
+          // Ignore errors — if this fails, the server will just cold-boot
+          // on the next real user request, same as before this existed.
+        });
+      }, 10 * 60 * 1000); // every 10 minutes
+    }
   } catch (err) {
     logger.error('Failed to start server', { error: err.message });
     process.exit(1);
