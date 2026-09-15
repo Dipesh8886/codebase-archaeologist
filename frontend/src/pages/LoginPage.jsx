@@ -13,6 +13,7 @@ export default function LoginPage() {
         className="max-w-md w-full text-center space-y-6"
       >
         <div className="space-y-2">
+          <img src="/logo.svg" alt="" className="h-14 w-14 mx-auto mb-2 rounded-2xl" />
           <h1 className="text-3xl font-semibold tracking-tight">Codebase Archaeologist</h1>
           <p className="text-gray-400">
             Ask questions about any GitHub repo and get answers with exact file citations.

@@ -1,47 +1,56 @@
-import { pipeline } from '@xenova/transformers';
+import axios from 'axios';
+import { config } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 
 /**
- * Embeddings run LOCALLY via transformers.js instead of calling Hugging
- * Face's hosted Inference API. This removes an entire class of failure
- * (HF changing/retiring API endpoints, rate limits, network flakiness for
- * this step) at zero cost — the model file (~90MB) downloads once on first
- * run and is cached on disk afterward, so every subsequent embedding call
- * is a local computation with no network dependency at all.
- *
- * Same model as before (all-MiniLM-L6-v2, 384-dim output) so nothing else
- * in the pipeline (Qdrant collection config, etc.) needs to change.
+ * Embeddings run via Hugging Face's hosted Inference API rather than
+ * locally in-process. Loading a transformer model directly inside this
+ * server was pushing memory usage past Render's free-tier 512MB limit,
+ * causing the whole process to be killed and restarted mid-index — which
+ * looked like "indexing is stuck" but was actually a crash loop. Calling
+ * the model over the network instead keeps this server's memory footprint
+ * small and constant regardless of repo size.
  */
 
-let embedderPromise = null;
+const HF_URL = (model) => `https://api-inference.huggingface.co/pipeline/feature-extraction/${model}`;
 
-function getEmbedder() {
-  if (!embedderPromise) {
-    logger.info('Loading local embedding model (first run downloads ~90MB, then cached)...');
-    embedderPromise = pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+async function callHf(texts, attempt = 1) {
+  try {
+    const response = await axios.post(
+      HF_URL(config.hf.embeddingModel),
+      { inputs: texts, options: { wait_for_model: true } },
+      {
+        headers: { Authorization: `Bearer ${config.hf.apiKey}` },
+        timeout: 30000,
+      }
+    );
+    return response.data;
+  } catch (err) {
+    // HF cold-starts a model on first use in a while (503 while it loads).
+    // Retry a couple of times with a short delay rather than failing the
+    // whole indexing job over a transient cold start.
+    const isModelLoading = err.response?.status === 503;
+    if (isModelLoading && attempt < 3) {
+      logger.warn(`HF embedding model still loading, retrying (attempt ${attempt})...`);
+      await new Promise((r) => setTimeout(r, 3000));
+      return callHf(texts, attempt + 1);
+    }
+    throw err;
   }
-  return embedderPromise;
 }
 
+const BATCH_SIZE = 32;
+
 async function embedBatch(texts) {
-  const embedder = await getEmbedder();
   const vectors = [];
-
-  // transformers.js pipelines process one input at a time most reliably;
-  // looping here is still fast since it's all local CPU inference with no
-  // network round-trip per item.
-  for (const text of texts) {
-    const output = await embedder(text, { pooling: 'mean', normalize: true });
-    vectors.push(Array.from(output.data));
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+    const batch = texts.slice(i, i + BATCH_SIZE);
+    const result = await callHf(batch);
+    vectors.push(...result);
   }
-
   return vectors;
 }
 
-/**
- * Embed an array of chunk texts. No batching/rate-limit handling needed
- * anymore since this never leaves the machine.
- */
 export async function embedChunks(chunkTexts) {
   return embedBatch(chunkTexts);
 }

@@ -1,18 +1,34 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+function formatTime(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 export default function ChatMessage({ qa }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex justify-end">
-        <div className="max-w-lg rounded-2xl rounded-br-sm bg-emerald-500 text-gray-900 px-4 py-2 text-sm font-medium">
-          {qa.question}
+        <div className="max-w-lg space-y-1">
+          <div className="rounded-2xl rounded-br-sm bg-emerald-500 text-gray-900 px-4 py-2 text-sm font-medium">
+            {qa.question}
+          </div>
+          {qa.createdAt && (
+            <p className="text-right text-[11px] text-gray-600 pr-1">
+              {formatTime(qa.createdAt)}
+            </p>
+          )}
         </div>
       </div>
 
       <div className="flex justify-start">
         <div className="max-w-2xl rounded-2xl rounded-bl-sm bg-gray-900 border border-gray-800 px-4 py-3 text-sm">
           <div className="prose prose-invert prose-sm max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{qa.answer}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {qa.answer}
+            </ReactMarkdown>
           </div>
 
           {qa.citations?.length > 0 && (
@@ -20,7 +36,7 @@ export default function ChatMessage({ qa }) {
               {qa.citations.map((c, i) => (
                 <a
                   key={i}
-                  href={`#`}
+                  href="#"
                   onClick={(e) => e.preventDefault()}
                   className="text-xs font-mono px-2 py-1 rounded bg-gray-800 text-emerald-300 hover:bg-gray-700 transition-colors"
                   title="Open in GitHub"
@@ -31,9 +47,13 @@ export default function ChatMessage({ qa }) {
             </div>
           )}
 
-          {qa.provider && qa.provider !== 'groq' && (
-            <p className="text-xs text-gray-500 mt-2">Answered by backup model ({qa.provider})</p>
-          )}
+          <div className="flex items-center justify-between mt-2">
+            {qa.provider && qa.provider !== 'groq' && (
+              <p className="text-xs text-gray-500">
+                Answered by backup model ({qa.provider})
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -5,15 +5,6 @@ import { vectorSearch } from '../services/vectorStore.service.js';
 import { bm25Search, hybridMerge } from '../services/bm25.service.js';
 import { askQuestion } from '../services/llm.service.js';
 
-/**
- * Hybrid search: vector similarity (semantic) + BM25 (exact keyword match),
- * merged via reciprocal rank fusion. Vector search alone misses exact
- * symbol/variable name matches (e.g. searching "getUserById" should surface
- * that literal function even if semantically similar code exists elsewhere);
- * BM25 alone misses conceptual matches phrased differently than the code.
- * Combining both is what the product spec calls for and meaningfully
- * improves retrieval quality over either alone.
- */
 export async function ask(req, res) {
   const { question } = req.body;
   const repo = await Repo.findOne({ _id: req.params.repoId, owner: req.user._id });
@@ -25,10 +16,6 @@ export async function ask(req, res) {
   const queryVector = await embedQuery(question);
   const vectorResults = await vectorSearch(repo._id.toString(), queryVector, 20);
 
-  // BM25 runs over the same candidate pool returned by vector search rather
-  // than the whole repo — keeps this fast without a separate keyword index
-  // service, while still catching exact-match chunks the vector step ranked
-  // lower than its top-K semantic matches.
   const bm25Results = bm25Search(question, vectorResults, 20);
   const topChunks = hybridMerge(vectorResults, bm25Results, 8);
 
@@ -37,6 +24,7 @@ export async function ask(req, res) {
       answer: "I couldn't find any relevant code for that question in this repo.",
       citations: [],
       provider: null,
+      createdAt: new Date(),
     });
   }
 
@@ -48,7 +36,7 @@ export async function ask(req, res) {
     endLine: c.endLine,
   }));
 
-  await QAHistory.create({
+  const record = await QAHistory.create({
     owner: req.user._id,
     repo: repo._id,
     question,
@@ -57,7 +45,7 @@ export async function ask(req, res) {
     llmProvider: provider,
   });
 
-  res.json({ answer, citations, provider });
+  res.json({ answer, citations, provider, createdAt: record.createdAt });
 }
 
 export async function listHistory(req, res) {
@@ -91,9 +79,6 @@ export async function exportHistory(req, res) {
     return res.send(markdown);
   }
 
-  // PDF export note: keep this as a lazy import — markdown-pdf pulls in a
-  // headless renderer we don't want loaded for every request that never
-  // touches export.
   const { default: markdownpdf } = await import('markdown-pdf');
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', 'attachment; filename="qa-history.pdf"');

@@ -31,7 +31,10 @@ export default function DashboardPage() {
   return (
     <div className="max-w-4xl mx-auto px-6 py-10">
       <header className="flex items-center justify-between mb-10">
-        <h1 className="text-xl font-semibold">Codebase Archaeologist</h1>
+        <div className="flex items-center gap-3">
+          <img src="/logo.svg" alt="" className="h-8 w-8 rounded-lg" />
+          <h1 className="text-xl font-semibold">Codebase Archaeologist</h1>
+        </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-400">{user?.githubUsername}</span>
           <button onClick={logout} className="text-sm text-gray-400 hover:text-white transition-colors">
