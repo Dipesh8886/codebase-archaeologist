@@ -5,7 +5,7 @@ import { api } from '../api/client.js';
 import ChatMessage from '../components/ChatMessage.jsx';
 import DependencyGraph from '../components/DependencyGraph.jsx';
 import RepoStatusBadge from '../components/RepoStatusBadge.jsx';
-import LoadingFacts from '../components/LoadingFacts.jsx';
+import IndexingProgress from '../components/IndexingProgress.jsx';
 
 export default function RepoWorkspacePage() {
   const { repoId } = useParams();
@@ -44,7 +44,7 @@ export default function RepoWorkspacePage() {
     askMutation.mutate(question.trim());
   }
 
-    async function exportHistory(format) {
+  async function exportHistory(format) {
     const response = await api.get(`/repos/${repoId}/questions/export`, {
       params: { format },
       responseType: 'blob',
@@ -64,12 +64,17 @@ export default function RepoWorkspacePage() {
 
   return (
     <div className="h-screen flex flex-col">
-      <header className="flex items-center justify-between px-6 py-3 border-b border-gray-800">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="text-gray-500 hover:text-white text-sm">
-            ← Back
+      <header className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+        <div className="flex items-center gap-4">
+          <Link
+            to="/"
+            className="flex items-center justify-center h-8 w-8 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+            title="Back to dashboard"
+          >
+            ←
           </Link>
-          <h1 className="font-medium">{repo.fullName}</h1>
+          <div className="h-5 w-px bg-gray-800" />
+          <h1 className="font-medium text-gray-100">{repo.fullName}</h1>
           <RepoStatusBadge status={repo.status} />
         </div>
 
@@ -80,10 +85,10 @@ export default function RepoWorkspacePage() {
           </div>
           {tab === 'chat' && (
             <div className="flex gap-2">
-              <button onClick={() => exportHistory('markdown')} className="text-xs text-gray-400 hover:text-white">
+              <button onClick={() => exportHistory('markdown')} className="text-xs text-gray-400 hover:text-white transition-colors">
                 Export .md
               </button>
-              <button onClick={() => exportHistory('pdf')} className="text-xs text-gray-400 hover:text-white">
+              <button onClick={() => exportHistory('pdf')} className="text-xs text-gray-400 hover:text-white transition-colors">
                 Export .pdf
               </button>
             </div>
@@ -150,18 +155,18 @@ function IndexingState({ status, errorMessage }) {
 
   if (status === 'failed') {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-red-400 text-sm">Indexing failed: {errorMessage}</p>
+      <div className="flex-1 flex items-center justify-center px-6">
+        <p className="text-red-400 text-sm text-center max-w-sm">Indexing failed: {errorMessage}</p>
       </div>
     );
   }
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-6">
+    <div className="flex-1 flex flex-col items-center justify-center gap-6 px-6">
       <div className="h-6 w-6 rounded-full border-2 border-gray-700 border-t-emerald-400 animate-spin" />
-      <p className="text-gray-400 text-sm">
+      <p className="text-gray-400 text-sm text-center max-w-sm">
         {status === 'pending' ? 'Queued for indexing…' : 'Indexing in progress — this can take a few minutes for larger repos.'}
       </p>
-      <LoadingFacts startedAt={startedAt} />
+      <IndexingProgress startedAt={startedAt} />
     </div>
   );
 }

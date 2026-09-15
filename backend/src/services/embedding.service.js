@@ -3,16 +3,15 @@ import { config } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 
 /**
- * Embeddings run via Hugging Face's hosted Inference API rather than
- * locally in-process. Loading a transformer model directly inside this
- * server was pushing memory usage past Render's free-tier 512MB limit,
- * causing the whole process to be killed and restarted mid-index — which
- * looked like "indexing is stuck" but was actually a crash loop. Calling
- * the model over the network instead keeps this server's memory footprint
- * small and constant regardless of repo size.
+ * Embeddings via Hugging Face's Inference API. Hugging Face retired the
+ * old api-inference.huggingface.co domain entirely (it no longer even
+ * resolves via DNS) in favor of a unified "router.huggingface.co" gateway
+ * under their new Inference Providers system. Same model, same request
+ * format — only the base URL changed.
  */
 
-const HF_URL = (model) => `https://api-inference.huggingface.co/pipeline/feature-extraction/${model}`;
+const HF_URL = (model) =>
+  `https://router.huggingface.co/hf-inference/models/${model}/pipeline/feature-extraction`;
 
 async function callHf(texts, attempt = 1) {
   try {
@@ -26,9 +25,6 @@ async function callHf(texts, attempt = 1) {
     );
     return response.data;
   } catch (err) {
-    // HF cold-starts a model on first use in a while (503 while it loads).
-    // Retry a couple of times with a short delay rather than failing the
-    // whole indexing job over a transient cold start.
     const isModelLoading = err.response?.status === 503;
     if (isModelLoading && attempt < 3) {
       logger.warn(`HF embedding model still loading, retrying (attempt ${attempt})...`);
