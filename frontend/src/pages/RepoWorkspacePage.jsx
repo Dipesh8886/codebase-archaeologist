@@ -5,6 +5,7 @@ import { api } from '../api/client.js';
 import ChatMessage from '../components/ChatMessage.jsx';
 import DependencyGraph from '../components/DependencyGraph.jsx';
 import RepoStatusBadge from '../components/RepoStatusBadge.jsx';
+import LoadingFacts from '../components/LoadingFacts.jsx';
 
 export default function RepoWorkspacePage() {
   const { repoId } = useParams();
@@ -145,6 +146,8 @@ function TabButton({ active, onClick, label }) {
 }
 
 function IndexingState({ status, errorMessage }) {
+  const [startedAt] = useState(() => Date.now());
+
   if (status === 'failed') {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -153,13 +156,12 @@ function IndexingState({ status, errorMessage }) {
     );
   }
   return (
-    <div className="flex-1 flex items-center justify-center">
-      <div className="text-center space-y-3">
-        <div className="h-6 w-6 rounded-full border-2 border-gray-700 border-t-emerald-400 animate-spin mx-auto" />
-        <p className="text-gray-400 text-sm">
-          {status === 'pending' ? 'Queued for indexing…' : 'Indexing in progress — this can take a few minutes for larger repos.'}
-        </p>
-      </div>
+    <div className="flex-1 flex flex-col items-center justify-center gap-6">
+      <div className="h-6 w-6 rounded-full border-2 border-gray-700 border-t-emerald-400 animate-spin" />
+      <p className="text-gray-400 text-sm">
+        {status === 'pending' ? 'Queued for indexing…' : 'Indexing in progress — this can take a few minutes for larger repos.'}
+      </p>
+      <LoadingFacts startedAt={startedAt} />
     </div>
   );
 }
