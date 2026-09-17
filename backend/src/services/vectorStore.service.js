@@ -13,9 +13,10 @@ qdrant.interceptors.response.use(
   (response) => response,
   (error) => {
     const qdrantMessage = error.response?.data?.status?.error || error.response?.data?.message;
-    if (qdrantMessage) {
-      error.message = `Qdrant error: ${qdrantMessage}`;
-    }
+    const status = error.response?.status;
+    error.message = qdrantMessage
+      ? `Qdrant error (${status}): ${qdrantMessage}`
+      : `Qdrant error (${status || 'no response'}): ${JSON.stringify(error.response?.data) || error.message}`;
     return Promise.reject(error);
   }
 );

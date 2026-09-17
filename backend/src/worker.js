@@ -24,7 +24,18 @@ async function processIndexingJob(job) {
 
   try {
     const [owner, repoName] = repo.fullName.split('/');
-    const allFiles = await listRepoFiles(user.githubAccessToken, owner, repoName, repo.defaultBranch);
+
+    let allFiles;
+    try {
+      allFiles = await listRepoFiles(user.githubAccessToken, owner, repoName, repo.defaultBranch);
+    } catch (githubErr) {
+      logger.error('GitHub file listing failed', {
+        status: githubErr.status,
+        message: githubErr.message,
+        response: JSON.stringify(githubErr.response?.data),
+      });
+      throw githubErr;
+    }
 
     let filesToIndex = allFiles;
     if (repo.scopedPath) {
