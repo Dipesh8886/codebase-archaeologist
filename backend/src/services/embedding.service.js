@@ -2,14 +2,6 @@ import axios from 'axios';
 import { config } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 
-/**
- * Embeddings via Hugging Face's Inference API. Hugging Face retired the
- * old api-inference.huggingface.co domain entirely (it no longer even
- * resolves via DNS) in favor of a unified "router.huggingface.co" gateway
- * under their new Inference Providers system. Same model, same request
- * format — only the base URL changed.
- */
-
 const HF_URL = (model) =>
   `https://router.huggingface.co/hf-inference/models/${model}/pipeline/feature-extraction`;
 
@@ -25,12 +17,16 @@ async function callHf(texts, attempt = 1) {
     );
     return response.data;
   } catch (err) {
-    const isModelLoading = err.response?.status === 503;
+    const status = err.response?.status;
+    const isModelLoading = status === 503;
     if (isModelLoading && attempt < 3) {
       logger.warn(`HF embedding model still loading, retrying (attempt ${attempt})...`);
       await new Promise((r) => setTimeout(r, 3000));
       return callHf(texts, attempt + 1);
     }
+    const hfMessage = JSON.stringify(err.response?.data) || err.message;
+    logger.error('HF embedding call failed', { status, response: hfMessage });
+    err.message = `HF embedding error (${status || 'no response'}): ${hfMessage}`;
     throw err;
   }
 }
