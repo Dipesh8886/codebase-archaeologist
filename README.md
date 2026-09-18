@@ -4,6 +4,11 @@ Ask natural-language questions about any GitHub repo and get AI-powered answers
 with exact file-level citations, plus an interactive dependency graph — built
 entirely on free tiers ($0/month).
 
+**Live app:** https://frontend-iyoron.vercel.app
+*(The backend runs on a free-tier server that sleeps after inactivity — the first request after a while may take 30–60 seconds to wake up.)*
+
+## Project structure
+
 ## Project structure
 
 ```
@@ -12,6 +17,7 @@ codebase-archaeologist/
 ├── frontend/    React + Vite + Tailwind SPA (see frontend/README.md)
 └── README.md    This file
 ```
+
 
 ## What was fixed vs. the original spec
 
@@ -30,6 +36,15 @@ codebase-archaeologist/
    directory-clustered; clicking a cluster lazy-loads just that folder's
    files. See `backend/src/services/dependencyGraph.service.js` and
    `frontend/src/components/DependencyGraph.jsx`.
+5. **Indexing worker runs in-process with the API** — Render's free tier only
+   supports one always-on web service (no separate background worker service),
+   so the BullMQ worker is started inside the same process as the Express
+   server (`backend/src/worker.js` exports `startIndexingWorker()`, called
+   from `server.js`) rather than run as a second deployed service.
+6. **Embeddings via hosted inference, not in-process** — embeddings call
+   Hugging Face's Inference API over the network rather than loading a
+   transformer model locally, which would risk exceeding the 512MB memory
+   limit on Render's free instance. See `backend/src/services/embedding.service.js`.
 
 ## Quick start
 
@@ -38,7 +53,8 @@ codebase-archaeologist/
    credentials — all free-tier signups.
 2. `bash scripts/generate-jwt-keys.sh` — paste the output into `.env`.
 3. `npm install && bash scripts/fetch-grammars.sh && npm run dev` — starts the API.
-4. In a second terminal: `npm run worker` — starts the background indexing worker.
+4. In a second terminal: `npm run worker` — starts the background indexing worker
+   standalone (for local dev only — in production it runs in-process with the API).
 5. `cd ../frontend && cp .env.example .env && npm install && npm run dev`.
 
 ## Deployment (all free tier)
@@ -46,11 +62,11 @@ codebase-archaeologist/
 | Component | Platform |
 |---|---|
 | Frontend | Vercel |
-| Backend API + Worker | Render (render.yaml included) |
+| Backend API (+ in-process worker) | Render — single web service (render.yaml included) |
 | Database | MongoDB Atlas (M0) |
 | Vector DB | Qdrant Cloud |
 | Cache/Queue | Upstash Redis |
 | LLM | Groq (primary), Gemini/OpenRouter (fallback) |
 | Embeddings | Hugging Face Inference API |
 
-See `backend/render.yaml` for the two-service (API + worker) Render config.
+See `backend/render.yaml` for the single-service Render config.
